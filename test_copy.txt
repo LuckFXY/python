@@ -1,0 +1,33 @@
+def main():
+    #prompt the user to enter filenames
+    #f1=input("Enter a source file: ").strip()
+    f1=askopenfilename()
+    print("You can read from:"+f1)
+    f2=asksaveasfilename()
+    
+    #f2=input("Enter a target file: ").strip()
+    
+    #Check if target file exists
+    if os.path.isfile(f2):
+        print(f2+" already exists")
+        sys.exit()
+        
+    #open files for input and output
+    infile=open(f1,"r")
+    outfile=open(f2,"w")def main():
+    #prompt the user to enter filenames
+    #f1=input("Enter a source file: ").strip()
+    f1=askopenfilename()
+    print("You can read from:"+f1)
+    f2=asksaveasfilename()
+    
+    #f2=input("Enter a target file: ").strip()
+    
+    #Check if target file exists
+    if os.path.isfile(f2):
+        print(f2+" already exists")
+        sys.exit()
+        
+    #open files for input and output
+    infile=open(f1,"r")
+    outfile=open(f2,"w")
