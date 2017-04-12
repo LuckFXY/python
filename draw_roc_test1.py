@@ -12,6 +12,7 @@ import pickle
 with open("draw_row_test1_data.pickle","rb") as f:
     data=pickle.load(f)
 #print (data)
+data=data[np.argsort(data[:,1])[::-1]]
 TAGS=[0,1]
 def getpredtag(probability,threashold=0.5):
     if probability>=threashold:
@@ -44,12 +45,12 @@ def mydraw(plot_data,xlabel,ylabel):
     pl.show()
 
    
-threshold_list=np.sort(data[:,1])[::-1]
+threshold_list=data[:,1]
 plot_data=np.zeros((len(threshold_list),2))
 i=0
 for threshold in threshold_list:
     plot_data[i]=calculate_rocxy(data,threshold)#(FPR,TPR)
-    print(plot_data[i])
+    #print(plot_data[i])
     i+=1
     
 mydraw(plot_data,'False positive rate','True positive rate')
