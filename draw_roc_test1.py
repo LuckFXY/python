@@ -11,8 +11,12 @@ import pickle
 
 with open("draw_row_test1_data.pickle","rb") as f:
     data=pickle.load(f)
+
 #print (data)
 data=data[np.argsort(data[:,1])[::-1]]
+print('\tLabel\tProbability')
+for d in data:
+    print(('\t%d\t%f')%(int(d[0]),d[1]))
 TAGS=[0,1]
 def getpredtag(probability,threashold=0.5):
     if probability>=threashold:
@@ -36,8 +40,8 @@ def calculate_rocxy(_data,threshold):
     FPR=FP/(TN+FP)
     return (FPR,TPR)
 
-def mydraw(plot_data,xlabel,ylabel):
-    pl.plot(plot_data[:,0],plot_data[:,1],label='roc')
+def mydraw(plot_x,plot_y,xlabel,ylabel):
+    pl.plot(plot_x,plot_y,label='roc')
     pl.title('FPR-TPR')
     pl.xlabel=xlabel
     pl.ylabel=ylabel
@@ -46,14 +50,21 @@ def mydraw(plot_data,xlabel,ylabel):
 
    
 threshold_list=data[:,1]
-plot_data=np.zeros((len(threshold_list),2))
+plot_x=np.zeros(len(threshold_list))
+plot_y=np.zeros(len(threshold_list))
 i=0
 for threshold in threshold_list:
-    plot_data[i]=calculate_rocxy(data,threshold)#(FPR,TPR)
+    plot_x[i],plot_y[i]=calculate_rocxy(data,threshold)#(FPR,TPR)
     #print(plot_data[i])
     i+=1
+def AUC(plot_x,plot_y):
+    i=0
+    s=0
+    for dy in plot_y[1:]:
+        dx=plot_x[i+1]-plot_x[i]
+        i+=1
+        s+=dx*dy
+    return s
     
-mydraw(plot_data,'False positive rate','True positive rate')
-    
-    
-    
+mydraw(plot_x,plot_y,'False positive rate','True positive rate')
+print(("AUC=%f")%(AUC(plot_x,plot_y)))
