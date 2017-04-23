@@ -6,11 +6,11 @@ Created on Wed Apr 19 17:11:23 2017
 """
 #for free
 
-from tkinter import Tk,Frame,Canvas,PhotoImage,Radiobutton,Entry,Button,Label,Menu
+from tkinter import Tk,Frame,Canvas,PhotoImage,Radiobutton,Entry,Button,Label,Menu,Checkbutton
 from tkinter import  IntVar,BooleanVar,StringVar
 from tkinter import  LEFT 
 from tkinter.filedialog import askdirectory,askopenfilename
-from PIL import Image,ImageTk,ImageDraw, ImageFilter
+from PIL import Image,ImageTk,ImageDraw, ImageFilter,ImageEnhance
 import os
 import tkinter.messagebox
 import sqlite3
@@ -25,6 +25,7 @@ class MyIO:
         if os.path.exists(foldername)==False:
             tkinter.messagebox.showerror("error",("folder: %s does exist")%(foldername))
         self.scan_folder(foldername)
+        self.pictures_path=foldername
         self.path='mydata.db'
         if os.path.exists(self.path)==False:
             self.createdb()
@@ -38,6 +39,7 @@ class MyIO:
                     filename=os.path.join(root,file)
                     self.filelist.append(filename)
         self.len_filelist=len(self.filelist)
+        print(("total : %d")%(len(self.filelist)))
 
     def nextfilename(self):
         if self.index < self.len_filelist-1:
@@ -73,6 +75,7 @@ class MyIO:
     def setdb_path(self,path):
         self.path=path
     def insertDB(self,filename,block):
+        filename=os.path.split(filename)[-1]
         #filename,InCir_D,InCir_X, InCir_Y,OutCir_D,OutCir_X, OutCir_Y=block
         conn=sqlite3.connect(self.path)
         c= conn.cursor()
@@ -81,6 +84,7 @@ class MyIO:
         conn.commit()
         conn.close()
     def updateDB(self,filename,block):
+        filename=os.path.split(filename)[-1]
         conn=sqlite3.connect(self.path)
         c= conn.cursor()
         block=block+[filename,]
@@ -94,7 +98,37 @@ class MyIO:
                   where filename = ?",block)
         conn.commit()
         conn.close()
+    def alterAllFNameDB(self):
+        #-------------------------------
+        conn=sqlite3.connect(self.path)
+        c= conn.cursor()
+
+        c.execute("Alter TABLE data RENAME TO data_old")
+        conn.commit()
+        
+        c.execute('''
+              CREATE TABLE data
+              (filename text,
+              InCir_D int,InCir_X int, InCir_Y int,
+              OutCir_D int,OutCir_X int, OutCir_Y int)
+              ''')
+        conn.commit() 
+        #-----------------------------
+        content=[row for row in c.execute('select * from data_old')]
+        for row in content:
+            print(row[0])
+            newfName=os.path.split(row[0])[-1]
+            block=(newfName,)+row[1:]
+            c.execute("INSERT INTO data VALUES (?,?,?,?,?,?,?)",block)
+            conn.commit()
+        
+        print("Altering filename in db finished")
+        
+        c.execute('DROP TABLE data_old')
+        conn.commit()
+        conn.close()
     def pickoneDB(self,filename):
+        filename=os.path.split(filename)[-1]
         conn=sqlite3.connect(self.path)
         c= conn.cursor()
         r=c.execute('select * from data where filename=?',(filename,))
@@ -107,19 +141,30 @@ class MyIO:
             conn.commit()
             conn.close()
             return result
-    def pickallDB(self):
+    def pickallDB(self,isoutputnames=False):
         conn=sqlite3.connect(self.path)
         c= conn.cursor()
         r=c.execute('select * from data ')
-        return [i for i in r]
+        if isoutputnames==True:
+            names=c.execute('select filename from data ')
+            return [i[0] for i in names]
+        else:
+            r=c.execute('select * from data ')
+            return [i for i in r]
         conn.commit()
         conn.close()
-    def processOK(self,filename,block):
+        
+    save_count=0
+    def processSaveDB(self,filename,block):
+        
+        filename=os.path.split(filename)[-1]
         data=self.pickoneDB(filename)
         if data==None:
             self.insertDB(filename,block)
         else:
             self.updateDB(filename,block)
+        self.save_count+=1
+        print(self.save_count,end=',')
 import numpy as np        
 class MainWindow:
     
@@ -138,8 +183,8 @@ class MainWindow:
             r=90
             box=(cw-r,ch-r,cw+r*2,ch+r)
             img_center=self.img_org.crop(box)
-            self.canvas.create_rectangle(box)
-            #img_center=img_center.filter(ImageFilter.MedianFilter(5))
+            #self.canvas.create_rectangle(box)
+            img_center=img_center.filter(ImageFilter.MedianFilter(5))
             img_center=img_center.convert("L")
             #img_center.show()
             w=img_center.size[0] #x
@@ -163,14 +208,15 @@ class MainWindow:
             #------------------------
             small_x+=cw-r
             small_y+=ch-r
-            self.inner_d.set(70)
+            
             self.inner_x.set(small_x)
             self.inner_y.set(small_y)
-            print(small,small_x,small_y)
+            #print(small,small_x,small_y)
             #-----------------------------   
             self.updateInterface(innercironly=True)
         else:
-            self.outside_d.set(self.inner_d.get()+102)
+            self.dr=self.outside_d.get()-self.inner_d.get()
+            self.outside_d.set(self.inner_d.get()+self.dr)
             self.outside_x.set(self.inner_x.get())
             self.outside_y.set(self.inner_y.get())
             self.recovercox()
@@ -208,13 +254,15 @@ class MainWindow:
     def autoTurn(self):
         
         data='start'
-        count=0
+        count=-1
         pic_num=self.myio.len_filelist
         while(data!=None and count<pic_num):
             count+=1
             self.processRButton()
             data=self.myio.pickoneDB(self.filename)
+        print(("You have finished %d pictures")%(count))
     def processRButton(self):
+        #print("RButton")
         self.lock=False
         self.filename=self.myio.nextfilename()
         self.showPicture(self.filename)
@@ -227,9 +275,12 @@ class MainWindow:
         else:
             self.processChooseInner()
             self.autoPositing()
-            
+    
+    def unknownError(self):
+            tkinter.messagebox.showerror("unknownError","Please resetart this script!!!")        
         
     def processLButton(self):
+        print("LButton")
         self.lock=False
         filename=self.myio.lastfilename()
         self.showPicture(filename)
@@ -249,11 +300,11 @@ class MainWindow:
         self.isInnerCircle=False
         self.autoPositing()
         
-    def processOk(self):
+    def processSave(self):
 
         filename=self.currentfile.get()
         block=[vi.get() for vi in self.variable_list[1:]]
-        self.myio.processOK(filename,block)
+        self.myio.processSaveDB(filename,block)
         #--------------draw a circle-------
         idraw=ImageDraw.Draw(self.img_org)
         r=block[0]//2
@@ -271,7 +322,7 @@ class MainWindow:
             outsidecirobx=self.inc_r(outsidecirobx)
         
         outputname='output_image/'+os.path.split(self.currentfile.get())[-1]
-        print(outputname)
+        #print(outputname)
         self.img_org.save(outputname)
             #----------------------------------
         self.processRButton()
@@ -283,9 +334,17 @@ class MainWindow:
     def showPicture(self,filename):
 
         self.img_org=Image.open(filename)
-        self.img=ImageTk.PhotoImage(self.img_org)
-        self.h=self.img.height()
-        self.w=self.img.width()
+        self.h=self.img_org.height
+        self.w=self.img_org.width
+        if self.isContrastEnh:
+            
+            box=(0,0,self.w,self.h)
+            img=self.img_org.crop(box)
+            contrast=ImageEnhance.Contrast(img)
+            contrast_img=contrast.enhance(2.0)
+            self.img=ImageTk.PhotoImage(contrast_img)
+        else:
+            self.img=ImageTk.PhotoImage(self.img_org)
         if self.canvas.find_withtag('img'):
             self.canvas.delete('img')       
         self.canvas.create_image(self.w//2,self.h//2,image=self.img)
@@ -350,7 +409,7 @@ class MainWindow:
            if self.isInnerCircle==True:
                self.processChooseOutside()
            else:
-               self.processOk()
+               self.processSave()
                
                
        self._DrawCircle(moving=False,update=True)
@@ -358,6 +417,7 @@ class MainWindow:
            
     def openFolder(self):
         filenameforReading=askdirectory()
+        
         self.myio=MyIO(filenameforReading)
         
         #self.processRButton()
@@ -367,10 +427,10 @@ class MainWindow:
     
     def openDatabase(self):
         filenameforReading=askopenfilename()
-        if self.myio==None:
-            self.myio=MyIO(filenameforReading)
-        else:
+        print(filenameforReading)
+        if self.myio!=None:
             self.myio.setdb_path(filenameforReading)
+            self.autoTurn()
         
     def outputcsv(self):
         data=self.myio.pickallDB()
@@ -388,10 +448,19 @@ class MainWindow:
             
     def outputpic(self):
         data=self.myio.pickallDB()
+        names=self.myio.pickallDB(True)
+        name_set=set(names)
+
+        index=0
         for row in data:
-            #--------------draw a circle-------
+            #--------------draw a circle-------  
+            filename=self.myio.filelist[index]
+            pic_name=os.path.split(filename)[-1]
             
-            self.img_org=Image.open(row[0])
+            if pic_name not in name_set:
+                index+=1
+                continue
+            self.img_org=Image.open(filename)
             idraw=ImageDraw.Draw(self.img_org)
             r=row[1]//2
             x=row[2]
@@ -410,17 +479,27 @@ class MainWindow:
             outputname='output_image/'+os.path.split(row[0])[-1]
             print(outputname)
             self.img_org.save(outputname)
+            index+=1
             #----------------------------------
-        
+    def AlterDBFName(self):
+        self.myio.alterAllFNameDB()
+    
+    def ContrastEnh(self):
+        if self.isContrastEnh==False:
+            self.isContrastEnh=True
+            
+        else:
+            self.isContrastEnh=False
+        self.showPicture(self.currentfile.get())
     def __init__(self):
         
         self.myio=None
-
+        self.isContrastEnh=False
         window=Tk()
         window.title("Assist Tool")       
         leftICO=PhotoImage(file="ICO/left.gif")
         rightICO=PhotoImage(file="ICO/right.gif")
-        okICO=PhotoImage(file="ICO/ok.gif")
+        SaveICO=PhotoImage(file="ICO/Save.gif")
         self.inner_x=IntVar()
         self.inner_y=IntVar()
         self.inner_d=IntVar()
@@ -470,7 +549,7 @@ class MainWindow:
         window.bind('<Key>',self.PressKey)
         
         #-------------show background picture-----
-
+        self.currentfile.set("ICO/rabbit640480.jpg")
         self.showPicture("ICO/rabbit640480.jpg")
         
         #--------------show filename 
@@ -487,6 +566,8 @@ class MainWindow:
             command=self.processChooseInner,variable=self.isInnerCircle,value=True)
         self.radio_innerCircle.grid(row=1,column=2)
         Label(frame_right_3,text="d").grid(row=2,column=1)
+        self.inner_d.set(70)
+        self.dr=102
         self.entry_inner_d=Entry(frame_right_3,textvariable=self.inner_d)
         self.entry_inner_d.grid(row=2,column=2)
         Label(frame_right_3,text="x").grid(row=3,column=1)
@@ -508,9 +589,15 @@ class MainWindow:
         Label(frame_right_4,text="y").grid(row=4,column=1)
         self.entry_outside_y=Entry(frame_right_4,textvariable=self.outside_y)
         self.entry_outside_y.grid(row=4,column=2)        
-        #-------------ok button
-        Button(frame_right_5,image=okICO,
-               command=self.processOk).pack(side=LEFT)
+        #-------------Save button
+        
+        
+        self.radio_isContrastEnh=Checkbutton(frame_right_5,text="Contrast Enhance",
+            command=self.ContrastEnh).pack()
+        #self.radio_isContrastEnh.deselect()
+        Button(frame_right_5,image=SaveICO,
+               command=self.processSave).pack()
+        
         #--------------menubar
         menubar=Menu(window)
         window.config(menu=menubar)
@@ -519,7 +606,9 @@ class MainWindow:
         openMenu.add_command(label="Folder",command=self.openFolder)     
         openMenu.add_command(label="sqlite3 database",command=self.openDatabase)
         openMenu.add_command(label="csv file",command=self.openCsv)
-        
+        AlterMenu=Menu(menubar,tearoff=0)
+        menubar.add_cascade(label="Alter",menu=AlterMenu)
+        AlterMenu.add_command(label="Alter db fName",command=self.AlterDBFName)
         outputMenu=Menu(menubar,tearoff=0)
         menubar.add_cascade(label="Output",menu=outputMenu)
         outputMenu.add_command(label="csv file",command=self.outputcsv)

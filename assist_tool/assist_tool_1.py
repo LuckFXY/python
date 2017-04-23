@@ -117,7 +117,7 @@ class MyIO:
         return [i for i in r]
         conn.commit()
         conn.close()
-    def processOK(self,filename,block):
+    def processSave(self,filename,block):
         data=self.pickoneDB(filename)
         if data==None:
             self.insertDB(filename,block)
@@ -167,7 +167,10 @@ class MainWindow:
     def autoTurn(self):
         
         data='start'
-        while(data!=None):
+        count=0
+        pic_num=self.myio.len_filelist
+        while(data!=None and count<pic_num):
+            count+=1
             self.processRButton()
             data=self.myio.pickoneDB(self.filename)
     def processRButton(self):
@@ -201,27 +204,31 @@ class MainWindow:
         self.isInnerCircle=False
         self.recovercox()
         
-    def processOk(self):
+    def processSave(self):
 
         filename=self.currentfile.get()
         block=[vi.get() for vi in self.variable_list[1:]]
-        self.myio.processOK(filename,block)
-        #---------
-        outputname='output_image/'+os.path.split(self.filename)[-1]
-        print(outputname)
+        self.myio.processSave(filename,block)
+        #--------------draw a circle-------
         idraw=ImageDraw.Draw(self.img_org)
-        r=self.inner_d.get()//2
-        x=self.inner_x.get()
-        y=self.inner_y.get()      
-        innercirobx=(x-r,y-r,x+r,y+r)
-        r=self.outside_d.get()//2
-        x=self.outside_x.get()
-        y=self.outside_y.get()      
-        outsidecirobx=(x-r,y-r,x+r,y+r)
-        idraw.ellipse(innercirobx,outline='white')
-        idraw.ellipse(outsidecirobx,outline='white')
+        r=block[0]//2
+        x=block[1]
+        y=block[2]    
+        innercirobx=[x-r,y-r,x+r,y+r]
+        r=block[3]//2
+        x=block[4]
+        y=block[5]   
+        outsidecirobx=[x-r,y-r,x+r,y+r]
+        for i in range(2):
+            idraw.ellipse(innercirobx,outline='white')
+            innercirobx=self.inc_r(innercirobx)
+            idraw.ellipse(outsidecirobx,outline='white')
+            outsidecirobx=self.inc_r(outsidecirobx)
+        
+        outputname='output_image/'+os.path.split(self.currentfile.get())[-1]
+        print(outputname)
         self.img_org.save(outputname)
-        #----------
+        #----------------------------------
         self.processRButton()
         self.isInnerCircle=True
         self.radio_innerCircle.select() 
@@ -254,7 +261,7 @@ class MainWindow:
         if not self.canvas.find_withtag(ch):
             self.canvas.create_oval(
                 self.x1,self.y1,self.x1+d,self.y1+d,
-                outline='white',tags=ch)
+                outline='white',tags=ch,width=2)
         elif moving:
             self.canvas.delete(ch)
             
@@ -303,7 +310,7 @@ class MainWindow:
                self.radio_innerCircle.selection_clear()
                self.radio_outsideCircle.select()
            else:
-               self.processOk()
+               self.processSave()
                
                
        self._DrawCircle(moving=False,update=True)
@@ -332,8 +339,38 @@ class MainWindow:
             f_csv=csv.writer(csvfile)
             for row in data:
                 f_csv.writerow(row)
-
-        
+    def inc_r(self,box):
+        r=[-1,-1,1,1]
+        for i in range(4):
+            box[i]+=r[i]
+        return box
+           
+    def outputpic(self):
+        data=self.myio.pickallDB()
+        for row in data:
+            #--------------draw a circle-------
+            
+            self.img_org=Image.open(row[0])
+            idraw=ImageDraw.Draw(self.img_org)
+            r=row[1]//2
+            x=row[2]
+            y=row[3]    
+            innercirobx=[x-r,y-r,x+r,y+r]
+            r=row[4]//2
+            x=row[5]
+            y=row[6]   
+            outsidecirobx=[x-r,y-r,x+r,y+r]
+            for i in range(2):
+                idraw.ellipse(innercirobx,outline='white')
+                innercirobx=self.inc_r(innercirobx)
+                idraw.ellipse(outsidecirobx,outline='white')
+                outsidecirobx=self.inc_r(outsidecirobx)
+            
+            outputname='output_image/'+os.path.split(row[0])[-1]
+            print(outputname)
+            self.img_org.save(outputname)
+    #----------------------------------
+            
     def __init__(self):
         
         self.myio=None
@@ -342,7 +379,7 @@ class MainWindow:
         window.title("Assist Tool")       
         leftICO=PhotoImage(file="ICO/left.gif")
         rightICO=PhotoImage(file="ICO/right.gif")
-        okICO=PhotoImage(file="ICO/ok.gif")
+        SaveICO=PhotoImage(file="ICO/Save.gif")
         self.inner_x=IntVar()
         self.inner_y=IntVar()
         self.inner_d=IntVar()
@@ -429,9 +466,9 @@ class MainWindow:
         Label(frame_right_4,text="y").grid(row=4,column=1)
         self.entry_outside_y=Entry(frame_right_4,textvariable=self.outside_y)
         self.entry_outside_y.grid(row=4,column=2)        
-        #-------------ok button
-        Button(frame_right_5,image=okICO,
-               command=self.processOk).pack(side=LEFT)
+        #-------------Save button
+        Button(frame_right_5,image=SaveICO,
+               command=self.processSave).pack(side=LEFT)
         #--------------menubar
         menubar=Menu(window)
         window.config(menu=menubar)
@@ -444,7 +481,7 @@ class MainWindow:
         outputMenu=Menu(menubar,tearoff=0)
         menubar.add_cascade(label="Output",menu=outputMenu)
         outputMenu.add_command(label="csv file",command=self.outputcsv)
-
+        outputMenu.add_command(label="picture",command=self.outputpic)
         #-------------finally---------     
         
         self.radio_innerCircle.select()
