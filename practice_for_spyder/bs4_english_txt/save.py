@@ -99,10 +99,13 @@ def getComposition(href,filename):
     with open(filename,"w",encoding="utf8") as f:
         f.writelines(output)
 
-
+output_folder = "output"
+if os.path.exists(output_folder) == False:
+    os.mkdir(output_folder)
 for i in range(len(composition_list)):
     one = composition_list[i]
     href = one.get("href")
     if href.find("en8848"):
         filename=str(i)+'.txt'
+        filename = os.path.join(output_folder, filename)
         getComposition(href,filename)
