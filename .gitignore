@@ -48,5 +48,7 @@ Temporary Items
 
 # my rule
 __pycache__/
-250/
-iris_sample/
+*.exe
+*.jar
+*.txt
+*.jpg
