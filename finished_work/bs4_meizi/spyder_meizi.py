@@ -8,7 +8,8 @@ import time
 import threading
 class MZitu():
     def __init__(self, baseURL=None, pages=None):
-        self.baseURL = "http://www.mzitu.com"
+        #self.baseURL = "http://www.mzitu.com"#adults only
+		self.baseURL = "http://127.0.0.1" 
         self.pages = pages
         self.download_path = "meizi"
         if os.path.exists(self.download_path) == False:
@@ -140,7 +141,7 @@ class MZitu():
 
 
 mz = MZitu()
-#mz.getAtlasPic("http://www.mzcandidateitu.com/99566")
+
 candidate = [
     '99566','48149','101498','117874','21618','68870','131887','131616','122284',
     '103328','97462','129128','123576','8474','20290','90056','63289','99666',
