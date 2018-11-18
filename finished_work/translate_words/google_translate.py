@@ -2,7 +2,10 @@
 #coding:utf-8
 '''
 运行环境 anaconda3 python3
-pip install googletrans
+需要的第三方包 googletrans 的支持，安装方法如下
+pip uninstall googletrans
+git clone https://github.com/BoseCorp/py-googletrans.git
+cd ./py-googletrans && python setup.py install
 '''
 import tkinter as tk
 from googletrans import Translator
